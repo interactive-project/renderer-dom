@@ -9,6 +9,7 @@
     "index.d.ts",
     "host.js",
     "renderers.js",
+    "messages.js",
     "docs",
     "fixtures",
     "README.md"
