@@ -1,0 +1,54 @@
+{
+  "protocolVersion": "1.0.0",
+  "id": "00000000-0000-4000-8000-000000000101",
+  "type": "interactive-project/quiz",
+  "activitySchemaVersion": "1.0.0",
+  "metadata": { "title": "DOM quiz fixture" },
+  "config": {
+    "schemaVersion": "1.0.0",
+    "questions": [
+      {
+        "id": "q1",
+        "kind": "single-choice",
+        "prompt": {
+          "kind": "text",
+          "schemaVersion": "1.0.0",
+          "value": {
+            "kind": "localized-text",
+            "schemaVersion": "1.0.0",
+            "defaultLocale": "en",
+            "translations": { "en": { "text": "Select A" } }
+          }
+        },
+        "options": [
+          {
+            "id": "a",
+            "content": {
+              "kind": "text",
+              "schemaVersion": "1.0.0",
+              "value": {
+                "kind": "localized-text",
+                "schemaVersion": "1.0.0",
+                "defaultLocale": "en",
+                "translations": { "en": { "text": "A" } }
+              }
+            }
+          },
+          {
+            "id": "b",
+            "content": {
+              "kind": "text",
+              "schemaVersion": "1.0.0",
+              "value": {
+                "kind": "localized-text",
+                "schemaVersion": "1.0.0",
+                "defaultLocale": "en",
+                "translations": { "en": { "text": "B" } }
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

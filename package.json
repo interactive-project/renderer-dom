@@ -1,0 +1,43 @@
+{
+  "name": "@interactive-project/renderer-dom",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Framework-independent DOM host and accessible activity renderers",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "host.js",
+    "renderers.js",
+    "docs",
+    "fixtures",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "default": "./index.js"
+    }
+  },
+  "scripts": {
+    "test": "node scripts/check-rendering.mjs && tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext scripts/type-consumer.mts"
+  },
+  "peerDependencies": {
+    "@interactive-project/content-node": "0.1.0",
+    "@interactive-project/protocol": "0.1.0",
+    "@interactive-project/registry": "0.1.0"
+  },
+  "devDependencies": {
+    "@interactive-project/content-node": "git+https://github.com/interactive-project/content-node.git#5adc3721b5c7dfeffbace17b8b17d5c83d0b49b9",
+    "@interactive-project/core": "git+https://github.com/interactive-project/core.git#502afd9bb2c9bea9303537c25f9a2e9d017b87f7",
+    "@interactive-project/events": "git+https://github.com/interactive-project/events.git#7251000eee1ddefafb8f760aadd8e6ca7f96dfa3",
+    "@interactive-project/flashcards": "git+https://github.com/interactive-project/flashcards.git#c637aa5c9c0db0cebf0f9d917ea941d3473d2ea8",
+    "@interactive-project/protocol": "git+https://github.com/interactive-project/protocol.git#0280e004ba863621a257b96819f34295c8db0ea7",
+    "@interactive-project/quiz": "git+https://github.com/interactive-project/quiz.git#e6d2cfd041d518d9eca6bb1270db19fd3619cb8b",
+    "@interactive-project/registry": "git+https://github.com/interactive-project/registry.git#e6ef81f960cc4cf2ec7a83a57b617d3ed65969a2",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "typescript": "^5.9.3"
+  }
+}
