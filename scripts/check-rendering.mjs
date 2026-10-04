@@ -17,6 +17,8 @@ const read = path => JSON.parse(readFileSync(new URL(`../${path}`, import.meta.u
 const quizActivityFixture = read('fixtures/quiz.single-choice.activity.json');
 const flashcardsActivityFixture = read('fixtures/flashcards.single-card.activity.json');
 const golden = read('fixtures/host-conformance.v1.json');
+const accessibilityContract = read('fixtures/accessibility-contract.v1.json');
+assert.equal(accessibilityContract.contractVersion, '1.0.0');
 let idCounter = 1000;
 let subscriptionRemovals = 0;
 const uuid = () => `00000000-0000-4000-8000-${String(idCounter++).padStart(12, '0')}`;
@@ -32,6 +34,7 @@ class FakeNode {
     this.parentNode = null;
     this.attributes = new Map();
     this.listeners = new Map();
+    this.style = { properties: new Map(), setProperty: (name, value) => this.style.properties.set(name, String(value)) };
   }
   get firstChild() { return this.children[0] ?? null; }
   get textContent() { return this.nodeType === 3 ? this.data : this.children.map(child => child.textContent).join(''); }
@@ -61,10 +64,23 @@ class FakeNode {
   }
   removeEventListener(type, listener) { this.listeners.get(type)?.delete(listener); }
   listenerCount(type) { return this.listeners.get(type)?.size ?? 0; }
+  focus() { this.ownerDocument.activeElement = this; }
+  async keydown(key) {
+    let prevented = false;
+    const event = { type: 'keydown', key, target: this, preventDefault() { prevented = true; } };
+    let current = this;
+    while (current) {
+      event.currentTarget = current;
+      for (const listener of [...(current.listeners.get('keydown') ?? [])]) await listener(event);
+      current = current.parentNode;
+    }
+    return { defaultPrevented: prevented };
+  }
   async click() { for (const listener of [...(this.listeners.get('click') ?? [])]) await listener({ type: 'click', target: this }); }
 }
 
 class FakeDocument {
+  constructor() { this.activeElement = null; }
   createElement(tag) { return new FakeNode(this, 1, tag); }
   createTextNode(text) { return new FakeNode(this, 3, '#text', String(text)); }
 }
@@ -220,6 +236,8 @@ assert(registry.registerEngine(flashcardsManifest, {
 }).registered);
 
 const host = createDomHost({ registry, createId: uuid, validateActivity: domainValidator });
+assert.throws(() => createDomHost({ registry, createId: uuid, designTokens: { accent: 'red' } }), /designTokens/);
+assert.throws(() => createDomHost({ registry, createId: uuid, motionPreference: 'animate' }), /motionPreference/);
 assert.equal(typeof globalThis.document, 'undefined');
 assert.equal(typeof globalThis.window, 'undefined');
 
@@ -233,6 +251,10 @@ assert.equal(typeof globalThis.window, 'undefined');
   await Promise.all([first.ready, second.ready]);
   assert.equal(first.status, 'mounted');
   assert.equal(second.status, 'mounted');
+  assert.equal(firstMount.getAttribute('lang'), 'en');
+  assert.equal(firstMount.getAttribute('dir'), 'ltr');
+  assert.equal(firstMount.getAttribute('data-motion-preference'), 'no-preference');
+  assert.equal(firstMount.getAttribute('data-interaction-mode'), 'standard');
   assert(hasText(firstMount, 'DOM quiz fixture'));
 
   const staleStart = button(firstMount, 'Start quiz');
@@ -274,12 +296,17 @@ assert.equal(typeof globalThis.window, 'undefined');
   assert(button(flashMount, 'Start study'));
   await button(flashMount, 'Start study').click();
   await waitFor(() => !!button(flashMount, 'Reveal answer'));
+  assert.equal(flashMount.ownerDocument.activeElement.getAttribute('data-ip-focus-key'), 'flashcard-front');
   assert(hasText(flashMount, 'Front side'));
   await button(flashMount, 'Reveal answer').click();
   await waitFor(() => !!button(flashMount, 'Rate good'));
+  assert.equal(flashMount.ownerDocument.activeElement.getAttribute('data-ip-focus-key'), 'flashcard-back');
   assert(hasText(flashMount, 'Back side'));
   await button(flashMount, 'Rate good').click();
   await waitFor(() => flashcardSessions[0].getProgress().complete);
+  await waitFor(() => flashMount.ownerDocument.activeElement?.getAttribute('data-ip-focus-key') === 'flashcard-front');
+  assert.equal(flashMount.ownerDocument.activeElement.getAttribute('data-ip-focus-key'), 'flashcard-front');
+  assert(allNodes(flashMount).some(node => node.getAttribute('data-ip-part') === 'flashcards-progress' && node.getAttribute('aria-live') === 'polite'));
   await waitFor(() => !!button(flashMount, 'Finish study'));
   await button(flashMount, 'Finish study').click();
   await waitFor(() => flashcardSessions[0].getState().lifecycle === 'completed');
@@ -463,6 +490,175 @@ assert.equal(typeof globalThis.window, 'undefined');
   assert.equal(subscriptionRemovals, 5);
 }
 
+{
+  const accessibleActivity = structuredClone(quizActivity);
+  accessibleActivity.id = uuid();
+  const secondQuestion = structuredClone(accessibleActivity.config.questions[0]);
+  secondQuestion.id = 'q2';
+  accessibleActivity.config.questions.push(secondQuestion);
+  quizAuthor.questions.push(structuredClone(secondQuestion));
+  quizAuthor.solutions.q2 = { kind: 'single-choice', answer: 'a' };
+  const hookParts = [];
+  const accessibleHost = createDomHost({
+    registry,
+    createId: uuid,
+    validateActivity: domainValidator,
+    localePreferences: ['ar'],
+    motionPreference: 'reduce',
+    interactionMode: 'nonvisual',
+    designTokens: { '--ip-accent': 'rebeccapurple' },
+    localize(key) { return key === 'renderer-dom.quiz.submit' ? 'إرسال مخصص' : ''; },
+    renderHooks: {
+      onElement(_element, info) {
+        hookParts.push(info.part);
+        if (info.part === 'quiz-option') throw new Error('Decoration errors are isolated.');
+      }
+    }
+  });
+  const mount = mountNode();
+  const accessible = accessibleHost.mountActivity({ activity: accessibleActivity, mount, sessionId: uuid(), attemptId: uuid() });
+  await accessible.ready;
+  assert.equal(mount.getAttribute('lang'), 'ar');
+  assert.equal(mount.getAttribute('dir'), 'rtl');
+  assert.equal(mount.getAttribute('data-motion-preference'), 'reduce');
+  assert.equal(mount.getAttribute('data-interaction-mode'), 'nonvisual');
+  assert.equal(mount.getAttribute('data-interactive-project-renderer'), 'dom');
+  assert.equal(mount.style.properties.get('--ip-accent'), 'rebeccapurple');
+  assert(button(mount, 'بدء الاختبار'), `built-in labels follow the selected locale: ${accessible.status}: ${mount.textContent}`);
+  assert(hookParts.includes('activity-root'));
+  await button(mount, 'بدء الاختبار').click();
+  await waitFor(() => !!button(mount, 'إرسال مخصص'));
+  assert.equal(mount.ownerDocument.activeElement.getAttribute('data-ip-focus-key'), 'quiz-question');
+  const questionGroup = allNodes(mount).find(node => node.getAttribute('data-ip-part') === 'quiz-question');
+  assert.equal(questionGroup.getAttribute('role'), 'group');
+  assert.equal(questionGroup.getAttribute('aria-label'), 'السؤال 1 من 2');
+  assert(allNodes(mount).some(node => node.getAttribute('data-ip-slot') === 'quiz.prompt'));
+  assert(hookParts.includes('quiz-option'), 'hooks receive semantic parts and cannot break rendering');
+
+  const currentNavigation = () => allNodes(mount).find(node => node.tagName === 'NAV');
+  const navigation = currentNavigation();
+  const firstQuestionButton = navigation.children[0];
+  assert.equal(firstQuestionButton.getAttribute('tabindex'), '0');
+  assert.equal(navigation.children[1].getAttribute('tabindex'), '-1');
+  const nextQuestion = await firstQuestionButton.keydown(accessibilityContract.keyboard.quizQuestionNavigation.rtlNext);
+  assert.equal(nextQuestion.defaultPrevented, true);
+  await waitFor(() => currentNavigation().children[1].getAttribute('aria-current') === 'step');
+  assert.equal(mount.ownerDocument.activeElement.getAttribute('data-ip-focus-key'), 'question-nav-1');
+  await currentNavigation().children[1].keydown('Home');
+  await waitFor(() => currentNavigation().children[0].getAttribute('aria-current') === 'step');
+  assert.equal(mount.ownerDocument.activeElement.getAttribute('data-ip-focus-key'), 'question-nav-0');
+
+  await button(mount, 'B').click();
+  await waitFor(() => mount.ownerDocument.activeElement.getAttribute('data-ip-focus-key') === 'quiz-option-1');
+  const answerControl = allNodes(mount).find(node => node.getAttribute('data-ip-focus-key') === 'quiz-option-1');
+  assert.equal(answerControl.getAttribute('aria-pressed'), 'true');
+  assert.equal(answerControl.tagName, 'BUTTON', 'native controls keep browser Tab/Enter/Space behavior');
+  await accessible.unmount();
+
+  const nonvisualActivity = structuredClone(accessibleActivity);
+  nonvisualActivity.id = uuid();
+  nonvisualActivity.config.questions[0].prompt = {
+    kind: 'math', schemaVersion: '1.0.0', format: 'tex', source: 'x + 1',
+    plainText: {
+      kind: 'localized-text', schemaVersion: '1.0.0', defaultLocale: 'en',
+      translations: { en: { text: 'Text alternative for the equation.' } }
+    }
+  };
+  let visualDriverCalls = 0;
+  const nonvisualMount = mountNode();
+  const nonvisualHandle = accessibleHost.mountActivity({
+    activity: nonvisualActivity,
+    mount: nonvisualMount,
+    sessionId: uuid(),
+    attemptId: uuid(),
+    services: {
+      content: {
+        drivers: [{
+          id: 'tests/visual-math-only', capabilities: { kinds: ['math'] },
+          render: () => { visualDriverCalls++; return { value: nonvisualMount.ownerDocument.createElement('canvas') }; }
+        }]
+      }
+    }
+  });
+  await nonvisualHandle.ready;
+  await button(nonvisualMount, 'بدء الاختبار').click();
+  await waitFor(() => hasText(nonvisualMount, 'Text alternative for the equation.'));
+  assert.equal(visualDriverCalls, 0, 'nonvisual mode uses the content node alternative instead of visual drivers');
+  assert(!allNodes(nonvisualMount).some(node => node.tagName === 'CANVAS'));
+  await nonvisualHandle.unmount();
+}
+
+{
+  const advancedType = 'interactive-project/simulation';
+  const advancedRegistry = createRegistry({ validateEngineManifest, validateRendererManifest });
+  const dispatched = [];
+  let dispatchSignal;
+  const advancedEngineManifest = engineManifest(advancedType, 'https://example.org/advanced.schema.json');
+  const advancedEngineRegistration = advancedRegistry.registerEngine(advancedEngineManifest, {
+    async createEngine(_activity, engineContext) {
+      return {
+        async dispatch(action, options) { dispatched.push(action); dispatchSignal = options.signal; return { status: 'accepted' }; },
+        getState() { return { actionSequence: dispatched.length }; },
+        getContext() { return { sessionId: engineContext.sessionId, revision: dispatched.length }; },
+        dispose() {}
+      };
+    },
+    evaluate() { return {}; }
+  });
+  assert(advancedEngineRegistration.registered, JSON.stringify(advancedEngineRegistration));
+  assert(advancedRegistry.registerRenderer({
+    manifestVersion: '1.0.0', id: 'tests/advanced-text-renderer', pluginVersion: '0.1.0', type: advancedType,
+    protocolVersions: ['1.0.0'], host: 'dom', activitySchemaVersions: ['1.0.0'], rendererContractVersion: '1.0.0'
+  }, {
+    createRenderer(context) {
+      const adapter = context.services[DOM_RENDERER_SERVICES];
+      assert.equal(adapter.interactionMode, 'nonvisual');
+      return {
+        update() {
+          while (context.mount.firstChild) context.mount.removeChild(context.mount.firstChild);
+          const instructions = context.mount.ownerDocument.createElement('p');
+          instructions.setAttribute('data-ip-part', 'advanced-alternative');
+          instructions.setAttribute('role', 'status');
+          instructions.textContent = 'Use the following button to continue without the visual board.';
+          context.mount.appendChild(instructions);
+          const control = context.mount.ownerDocument.createElement('button');
+          control.setAttribute('type', 'button');
+          control.setAttribute('aria-label', 'Continue without visual board');
+          control.textContent = 'Continue';
+          control.addEventListener('click', async () => {
+            await adapter.dispatchAction('continue', { mode: 'text' });
+          });
+          context.mount.appendChild(control);
+        },
+        dispose() {}
+      };
+    }
+  }).registered);
+  const advancedHost = createDomHost({ registry: advancedRegistry, createId: uuid, interactionMode: 'nonvisual' });
+  const activity = {
+    protocolVersion: '1.0.0', id: uuid(), type: advancedType, activitySchemaVersion: '1.0.0',
+    metadata: { title: 'Advanced task' }, config: {}
+  };
+  const mount = mountNode();
+  const sessionId = uuid();
+  const advanced = advancedHost.mountActivity({ activity, mount, sessionId });
+  await advanced.ready;
+  const alternative = allNodes(mount).find(node => node.getAttribute('data-ip-part') === 'advanced-alternative');
+  const control = allNodes(mount).find(node => node.tagName === 'BUTTON');
+  assert.equal(alternative.getAttribute('role'), 'status');
+  assert.equal(control.getAttribute('aria-label'), 'Continue without visual board');
+  await control.click();
+  assert.equal(dispatched[0].type, `${advancedType}.continue`);
+  assert.deepEqual(dispatched[0].payload, { mode: 'text' });
+  assert.equal(dispatched[0].sessionId, sessionId);
+  assert.equal(dispatched[0].sequence, 0);
+  assert.match(dispatched[0].id, /^[0-9a-f-]{36}$/);
+  assert.equal(dispatchSignal.aborted, false);
+  await advanced.unmount();
+  assert.equal(dispatchSignal.aborted, true, 'the advanced adapter action receives host-owned cancellation');
+  advancedRegistry.dispose();
+}
+
 registrations.dispose();
 registry.dispose();
-console.log('DOM host: real Quiz/Flashcards action traces, ContentNode text/fallback, accessible states, independent lookup, isolation, owned-child and abort/disposal lifecycle passed.');
+console.log('DOM host: real Quiz/Flashcards action traces, localized semantics, RTL keyboard/focus behavior, style hooks, ContentNode fallbacks and lifecycle checks passed.');

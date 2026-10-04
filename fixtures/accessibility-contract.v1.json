@@ -1,0 +1,44 @@
+{
+  "contractVersion": "1.0.0",
+  "activityTypes": ["interactive-project/quiz", "interactive-project/flashcards"],
+  "nativeControl": "button",
+  "semanticPartsAttribute": "data-ip-part",
+  "slotAttribute": "data-ip-slot",
+  "keyboard": {
+    "activation": ["Enter", "Space"],
+    "tabOrder": "native-dom-order",
+    "quizQuestionNavigation": {
+      "ltrNext": "ArrowRight",
+      "ltrPrevious": "ArrowLeft",
+      "rtlNext": "ArrowLeft",
+      "rtlPrevious": "ArrowRight",
+      "first": "Home",
+      "last": "End",
+      "wrap": true
+    }
+  },
+  "focus": {
+    "quizStart": "quiz-question",
+    "quizAnswer": "selected-option",
+    "quizSubmit": "quiz-feedback",
+    "flashcardReveal": "flashcard-back",
+    "flashcardRateOrNext": "flashcard-front"
+  },
+  "announcements": ["host-status", "quiz-feedback", "flashcards-progress", "content-fallback"],
+  "locales": ["en", "es", "ar"],
+  "rtlLanguages": ["ar", "fa", "he", "ur", "ps", "sd", "ug", "yi"],
+  "motion": {
+    "hostPreferenceAttribute": "data-motion-preference",
+    "reducedValue": "reduce",
+    "builtInAnimation": false
+  },
+  "interactionMode": ["standard", "nonvisual"],
+  "customization": {
+    "customPropertyPrefix": "--ip-",
+    "frameworkRequired": false
+  },
+  "verification": {
+    "automated": ["semantic-contract", "keyboard-state-transitions", "localized-labels", "rtl-direction", "focus-restoration", "content-fallback"],
+    "manual": ["keyboard-only", "screen-reader-announcements", "reduced-motion", "rtl-reading-order"]
+  }
+}

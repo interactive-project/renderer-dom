@@ -7,6 +7,17 @@ declare const activity: ActivitySpec;
 declare const mount: unknown;
 
 const host = createDomHost({ registry, createId: () => '00000000-0000-4000-8000-000000000001' });
+const accessibleHost = createDomHost({
+  registry,
+  createId: () => '00000000-0000-4000-8000-000000000002',
+  localePreferences: ['ar'],
+  motionPreference: 'reduce',
+  interactionMode: 'nonvisual',
+  designTokens: { '--ip-accent': 'rebeccapurple' },
+  renderHooks: { onElement(element, info) { void element; void info.part; void info.direction; } },
+  localize(messageKey, locale) { return `${messageKey}:${locale}`; }
+});
+void accessibleHost;
 const rendererHandles = registerDomRenderers(registry);
 const handle = host.mountActivity({ activity, mount, sessionId: 'session-id' });
 void handle.ready;
