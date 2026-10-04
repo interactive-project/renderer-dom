@@ -1,0 +1,25 @@
+{
+  "fixtureVersion": "1.0.0",
+  "host": "dom",
+  "protocolVersion": "1.0.0",
+  "rendererContractVersion": "1.0.0",
+  "traces": [
+    {
+      "fixture": "quiz.single-choice.activity.json",
+      "actions": [
+        { "type": "interactive-project/quiz.start", "payload": {} },
+        { "type": "interactive-project/quiz.answer", "payload": { "response": { "questionId": "q1", "kind": "single-choice", "answer": "a" } } },
+        { "type": "interactive-project/quiz.submit", "payload": {} },
+        { "type": "interactive-project/quiz.complete", "payload": {} }
+      ]
+    },
+    {
+      "fixture": "flashcards.single-card.activity.json",
+      "lifecycle": ["start", "complete"],
+      "actions": [
+        { "type": "interactive-project/flashcards.reveal", "payload": {} },
+        { "type": "interactive-project/flashcards.rate", "payload": { "rating": "good" } }
+      ]
+    }
+  ]
+}

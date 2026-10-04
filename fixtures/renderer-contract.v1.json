@@ -1,0 +1,18 @@
+{
+  "contractVersion": "1.0.0",
+  "host": "dom",
+  "checks": [
+    "independent-registry-engine-and-renderer-lookup",
+    "loading-unsupported-validation-error-runtime-error",
+    "semantic-quiz-and-flashcard-actions",
+    "content-node-text-driver-and-accessible-fallback",
+    "idempotent-unmount-and-owned-child-cleanup",
+    "abort-pending-asset-and-isolate-two-mounts",
+    "no-browser-global-required-for-import-or-engine-creation"
+  ],
+  "unsupported": [
+    "quiz question kinds other than single-choice, multiple-choice and true-false",
+    "content kinds without a registered driver are displayed through accessible text fallback",
+    "media fetching, framework adapters, styling, and cross-activity composition are host-provided"
+  ]
+}
